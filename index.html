@@ -1,390 +1,952 @@
-# 2. Módulos do Sistema
-
-Este documento detalha os módulos do CRM Leev Clinic no âmbito da Análise de Requisitos. Os dois primeiros módulos (Empresas e Usuários) formam a base de multi-tenancy e controle de acesso.
-
----
-
-## 2.1. Módulo de Empresas (Clínicas)
-
-### Visão geral
-
-Representa as **clínicas/clientes** que utilizam o sistema. É a unidade básica de multi-tenancy: cada empresa possui suas próprias configurações, plano contratado, integrações e regras de operação.
-
-### Principais dados da empresa
-
-- **Identificação e contato**
-  - Nome da clínica
-  - CNPJ (ou CPF quando aplicável)
-  - Telefone(s) e e-mail principal
-  - Endereço (cidade, UF, país)
-  - Logo (armazenado em MinIO ou equivalente)
-- **Configuração comercial**
-  - Plano atual: Base, Controle ou Performance
-  - Status: trial, ativo, suspenso, cancelado
-  - Datas: início do contrato, fim de contrato, fim do trial
-  - Fuso horário e formato de data/hora
-- **Configuração operacional**
-  - Horário de funcionamento por dia da semana
-  - Regras de encaixe e bloqueio de agenda
-  - Antecedência mínima para agendamento e remarcação
-- **Configuração de marketing**
-  - Canais habilitados (WhatsApp, formulários, etc.)
-  - Horários em que a clínica deseja receber leads na agenda
-  - Modelos de mensagem padrão (primeira abordagem, follow-up)
-- **Configuração financeira**
-  - Parâmetros de geração de boletos (banco, carteira, instruções)
-  - Política de cobrança (quantidade de lembretes, intervalos, canais)
-- **LGPD e governança**
-  - Responsável LGPD da clínica (quando aplicável)
-  - Preferências de retenção de dados
-
-### Regras de negócio principais
-
-- Uma empresa pode ter várias **unidades/filiais** (opcional), cada uma com agenda e profissionais próprios.
-- Uma empresa possui vários **usuários**, cada um com permissões específicas (ver Módulo de Usuários).
-- O **plano** da empresa define quais módulos estão disponíveis (ex.: Marketing completo apenas em Controle/Performance) e limites de uso (usuários, profissionais, campanhas ativas), quando aplicável.
-- Apenas empresas em status **trial** ou **ativo** podem captar leads, agendar e gerar boletos; em **cancelado**, o acesso a dados históricos pode ser mantido conforme política de retenção.
-
-### Requisitos funcionais (empresa)
-
-| ID        | Descrição |
-|-----------|-----------|
-| RF-EMP-01 | Cadastrar, editar e inativar empresas (clínicas). |
-| RF-EMP-02 | Definir plano, status e datas de vigência. |
-| RF-EMP-03 | Configurar horários de funcionamento e regras básicas de agenda por empresa/unidade. |
-| RF-EMP-04 | Configurar canais e horários de captação de leads (Marketing). |
-| RF-EMP-05 | Configurar parâmetros de boletos (banco, carteira, instruções padrão). |
-| RF-EMP-06 | Anexar logo e dados visuais para uso em documentos (receitas, atestados, boletos, portal do paciente). |
-| RF-EMP-07 | Registrar e exibir histórico de alterações críticas (plano, status, parâmetros financeiros). |
-
----
-
-## 2.2. Módulo de Usuários
-
-### Visão geral
-
-Gerencia **quem** acessa o sistema e **o que cada um pode fazer** em uma ou mais empresas. Suporta cenários em que um mesmo usuário atua em várias clínicas, com perfis e permissões diferentes por empresa (SDR, recepção, médico/dentista, financeiro, gestor).
-
-### Principais dados do usuário
-
-- **Autenticação**
-  - Nome completo
-  - E-mail (login)
-  - Senha (armazenada em hash)
-  - Status: ativo, inativo, convite pendente
-- **Perfil**
-  - Tipo de usuário (rótulo principal: SDR, Recepção, Médico/Dentista, Financeiro, Gestor, Admin do sistema)
-  - Foto/avatar (opcional)
-  - Idioma e preferências (fuso horário, notificações)
-- **Vínculo com empresas**
-  - Para cada empresa: papel/perfil e conjunto de permissões granulares (ver abaixo).
-
-### Modelo de permissões (multi-empresa)
-
-- Um usuário pode estar vinculado a **uma ou várias empresas**.
-- Para cada vínculo usuário–empresa, define-se:
-  - **Papel principal** (ex.: Gestor, Recepção, Médico, Financeiro).
-  - **Permissões por módulo**, por exemplo:
-    - **Marketing**: visualizar campanhas e leads; criar/editar campanhas; pausar/reativar campanhas.
-    - **Agenda**: visualizar agenda; criar/editar/remarcar agendamentos; bloquear horários.
-    - **Pacientes/Prontuário**: visualizar dados básicos do paciente; visualizar prontuário completo (quando perfil médico); editar prontuário; anexar documentos.
-    - **Financeiro**: visualizar boletos; gerar boletos; registrar recebimentos manuais.
-    - **Relatórios**: acesso a dashboards consolidados.
-- Usuários **não médicos** podem ter acesso restrito a dados sensíveis de prontuário (ex.: apenas status do atendimento, sem conteúdo clínico detalhado).
-
-### Regras de negócio principais
-
-- Um usuário **não acessa** uma empresa se não tiver vínculo ativo com ela ou estiver marcado como inativo para aquela empresa.
-- Permissões são sempre avaliadas **por empresa**; não existe “super usuário global” sem contexto de empresa, exceto Admin do sistema (quando aplicável).
-- Ações sensíveis exigem perfil específico (ex.: edição de prontuário completo apenas para perfis médicos/dentistas autorizados; alteração de plano da empresa apenas para gestor/dono ou admin).
-- **Auditoria**: toda ação sensível (acesso a prontuário, geração de boleto, alteração de permissões) deve ser registrada com usuário, empresa, data/hora e ação.
-
-### Requisitos funcionais (usuários)
-
-| ID        | Descrição |
-|-----------|-----------|
-| RF-USR-01 | Cadastrar usuário com e-mail, senha e tipo de usuário. |
-| RF-USR-02 | Convidar usuário por e-mail para acessar uma empresa. |
-| RF-USR-03 | Associar usuário a uma ou mais empresas, definindo papel e permissões em cada uma. |
-| RF-USR-04 | Ativar/inativar usuário no sistema e/ou em uma empresa específica. |
-| RF-USR-05 | Definir e alterar permissões granulares por módulo (Marketing, Agenda, Pacientes, Prontuário, Financeiro, Relatórios). |
-| RF-USR-06 | Registrar log de acesso e ações sensíveis (principalmente prontuário e financeiro). |
-| RF-USR-07 | Permitir recuperação de senha e troca segura de credenciais. |
-
----
-
-## 2.3. Módulo de Marketing (Captação de Leads)
-
-### Visão geral
-
-Responsável por **trazer oportunidades novas para a clínica** e organizar o funil de leads desde a origem (campanha) até o momento em que o lead está pronto para agendar. É onde o Leev se posiciona como um “gestor de tráfego automático” dentro da clínica.
-
-### Principais conceitos e dados
-
-- **Campanha de marketing**
-  - Nome da campanha
-  - Empresa/unidade vinculada
-  - Canal (WhatsApp, formulário, landing page, remarketing em carteira antiga, outros)
-  - Datas de início e fim
-  - Orçamento estimado (opcional)
-  - Status: rascunho, ativa, pausada, encerrada
-- **Origem de lead**
-  - Identificador técnico (ID de mensagem do WhatsApp, UTM, formulário específico)
-  - Canal e campanha associados
-- **Lead**
-  - Dados básicos: nome (quando disponível), telefone, e-mail (opcional)
-  - Origem (campanha/canal)
-  - Situação no funil: novo, em atendimento automático, aguardando resposta, pronto para agendar, perdido, convertido em paciente
-  - Timestamps importantes (entrada, primeira resposta, agendamento, perda)
-- **Regras de atendimento automático**
-  - Fluxos de mensagens automáticas por campanha
-  - Janelas de horário em que o robô pode interagir
-  - Limites de tentativas e tempo entre tentativas
-  - Modelos de mensagem personalizáveis por campanha, incluindo campanhas de **remarketing para carteira antiga** (ex.: pacientes que não voltam há X meses)
-
-### Regras de negócio principais
-
-- Todo lead deve estar vinculado a **uma empresa** e, quando possível, a **uma campanha** específica.
-- O sistema deve registrar o **ID da conversa no WhatsApp** ou identificador equivalente para rastrear custos e mensagens.
-- O fluxo automático de mensagens respeita:
-  - janela de 24 horas de mensagens iniciadas pelo paciente;
-  - regras de janelas pagas da Meta, quando for disparo ativo.
-- Quando um lead atinge condição de “pronto para agendar”, ele:
-  - é encaminhado para o módulo de **Agenda**, já com contexto básico;
-  - mantém o vínculo com a campanha para análise de resultado.
-- A clínica pode pausar uma campanha a qualquer momento; novos leads deixam de ser aceitos por aquela origem.
-
-### Requisitos funcionais (marketing)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-MKT-01  | Cadastrar, editar, ativar, pausar e encerrar campanhas de marketing por empresa/unidade. |
-| RF-MKT-02  | Definir canal, origem técnica (ex.: ID de mensagem/landing page) e janelas de horário de atendimento automático. |
-| RF-MKT-03  | Registrar leads com origem (campanha, canal, identificador técnico). |
-| RF-MKT-04  | Executar fluxo automático de mensagens para leads novos, respeitando janelas e regras configuradas. |
-| RF-MKT-05  | Atualizar o status do lead no funil (novo, em atendimento, pronto para agendar, perdido, convertido). |
-| RF-MKT-06  | Integrar com o módulo de Agenda para criar uma oportunidade de agendamento quando o lead estiver pronto. |
-| RF-MKT-07  | Registrar métricas básicas de campanha (leads recebidos, leads em atendimento, leads que agendaram). |
-| RF-MKT-08  | Permitir campanhas de remarketing para carteira antiga de pacientes (ex.: filtrando por tempo sem retorno) com personalização de mensagem por campanha. |
-
----
-
-## 2.4. Módulo de Agenda
-
-### Visão geral
-
-Centraliza **todos os agendamentos da clínica**, conectando leads vindos do Marketing com os profissionais, salas e horários disponíveis. É a visão do dia a dia da recepção e do time clínico.
-
-### Principais conceitos e dados
-
-- **Agenda de profissional/unidade**
-  - Empresa/unidade
-  - Profissional responsável
-  - Grade de horários padrão (baseada na configuração da empresa)
-- **Agendamento**
-  - Paciente (ou lead, quando ainda não convertido)
-  - Data, horário de início e duração prevista
-  - Profissional e, opcionalmente, sala
-  - Origem (lead de campanha X, retorno, walk-in, indicação)
-  - Status: marcado, confirmado, em atendimento, concluído, remarcado, cancelado, falta
-- **Regras de confirmação e lembretes**
-  - Janelas e canais de envio (WhatsApp)
-  - Mensagens padrão (configuradas por empresa)
-- **Bloqueios e encaixes**
-  - Bloqueios manuais por horário/dia
-  - Marcação de encaixe (sobreposição controlada)
-
-### Regras de negócio principais
-
-- A agenda só pode ser criada dentro da janela de funcionamento definida na **empresa** (ou unidade), respeitando bloqueios adicionais.
-- Um lead vindo do módulo de Marketing pode gerar:
-  - um agendamento diretamente;
-  - ou uma “pré-reserva” de horário até a confirmação do paciente.
-- O robô de lembrete:
-  - avisa o paciente quando o horário é agendado;
-  - envia lembretes configuráveis (por exemplo, no dia e alguns dias antes) para reduzir faltas.
-- Alterações sensíveis (cancelar, remarcar, registrar falta) devem ficar registradas com usuário, data e motivo.
-
-### Requisitos funcionais (agenda)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-AGD-01  | Gerenciar agendas por profissional/unidade, com base no horário de funcionamento da empresa. |
-| RF-AGD-02  | Criar, editar, remarcar e cancelar agendamentos. |
-| RF-AGD-03  | Permitir marcação de encaixes e bloqueios de horários. |
-| RF-AGD-04  | Receber leads “prontos para agendar” do módulo de Marketing e facilitar a conversão em agendamento. |
-| RF-AGD-05  | Enviar confirmações e lembretes automáticos de agendamento via WhatsApp, conforme regras da empresa. |
-| RF-AGD-06  | Registrar status do atendimento (marcado, confirmado, concluído, falta, cancelado) e histórico de alterações. |
-| RF-AGD-07  | Disponibilizar visão de dia/semana da agenda para recepção e profissionais. |
-
----
-
-## 2.5. Módulo de Pacientes
-
-### Visão geral
-
-Centraliza o cadastro de **pacientes** e sua relação com a clínica ao longo do tempo. É a base para a linha do tempo do paciente, integração com prontuário, agenda e financeiro.
-
-### Principais conceitos e dados
-
-- **Paciente**
-  - Dados pessoais: nome completo, data de nascimento, documento (CPF/RG ou equivalente)
-  - Contatos: telefone(s), e-mail, endereço
-  - Preferências de contato (WhatsApp, e-mail, telefone)
-  - Dados adicionais relevantes à clínica (ex.: convênio/plano, responsável financeiro)
-- **Histórico de relacionamento**
-  - Primeiro contato (origem, data)
-  - Data do primeiro agendamento e do primeiro atendimento
-  - Último atendimento, última ausência/falta, última campanha de remarketing recebida
-- **Vínculos**
-  - Empresa/unidade principal
-  - Profissionais mais frequentes (quando aplicável)
-
-### Regras de negócio principais
-
-- Um paciente pode estar vinculado a **uma ou mais empresas** (ex.: redes/grupos), mantendo histórico separado por empresa.
-- Informações sensíveis (ex.: dados clínicos) são mantidas no módulo de **Prontuário**, mas a linha do tempo do paciente pode exibir resumos de eventos (atendimento, documento gerado, boleto emitido) sem conteúdo clínico detalhado.
-- O cadastro de paciente pode ser:
-  - criado a partir de um lead (conversão Marketing → Paciente);
-  - criado diretamente pela recepção/médico;
-  - atualizado automaticamente ao longo dos atendimentos.
-
-### Requisitos funcionais (pacientes)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-PAC-01  | Cadastrar, editar e inativar pacientes por empresa/unidade. |
-| RF-PAC-02  | Converter um lead em paciente, mantendo o vínculo com a origem/campanha. |
-| RF-PAC-03  | Visualizar a linha do tempo de eventos do paciente (agendamentos, atendimentos, documentos, boletos). |
-| RF-PAC-04  | Pesquisar pacientes por nome, documento, telefone ou e-mail. |
-| RF-PAC-05  | Registrar e atualizar preferências de contato do paciente. |
-
----
-
-## 2.6. Módulo de Prontuário
-
-### Visão geral
-
-Responsável pelo **registro clínico estruturado** de cada paciente, incluindo evoluções, odontograma, anexos e documentos gerados (receitas, atestados), garantindo rastreabilidade e segurança.
-
-### Principais conceitos e dados
-
-- **Prontuário do paciente**
-  - Fichas de anamnese
-  - Evoluções clínicas (data, profissional, descrição, procedimentos)
-  - Odontograma visual (no caso de odontologia), com histórico por dente/região
-- **Documentos clínicos**
-  - Receituários e atestados gerados com:
-    - logo da clínica em marca d’água
-    - assinatura digital do profissional (quando suportado)
-    - metadados (data, profissional, paciente)
-  - Envio automático via WhatsApp para o paciente quando configurado
-- **Anexos**
-  - Exames, imagens, PDFs e outros arquivos vinculados ao paciente/atendimento
-
-### Regras de negócio principais
-
-- O acesso ao conteúdo do prontuário é restrito a perfis autorizados (principalmente médicos/dentistas).
-- Toda alteração em prontuário deve ser auditável (quem alterou, quando, o que foi alterado).
-- Documentos gerados (receitas, atestados) devem poder ser:
-  - visualizados no sistema;
-  - impressos/baixados em PDF;
-  - enviados diretamente ao paciente via WhatsApp.
-- Odontograma deve guardar histórico de alterações, não apenas o estado atual.
-
-### Requisitos funcionais (prontuário)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-PRT-01  | Registrar e editar anamnese e evoluções clínicas por paciente. |
-| RF-PRT-02  | Manter odontograma visual com histórico de procedimentos por dente/região. |
-| RF-PRT-03  | Anexar e visualizar arquivos (exames, imagens, PDFs) vinculados ao paciente/atendimento. |
-| RF-PRT-04  | Gerar receituários e atestados com logo em marca d’água e, quando aplicável, assinatura digital do profissional. |
-| RF-PRT-05  | Enviar documentos clínicos ao paciente via WhatsApp, quando autorizado pela clínica. |
-| RF-PRT-06  | Registrar trilha de auditoria para acessos e alterações em prontuário. |
-
----
-
-## 2.7. Módulo Financeiro
-
-### Visão geral
-
-Controla **contratos, boletos, recebíveis e inadimplência**, conectando-se diretamente com atendimentos e planos de tratamento. É o elo entre o que foi feito na clínica e o que foi efetivamente recebido.
-
-### Principais conceitos e dados
-
-- **Contrato/plano financeiro**
-  - Paciente, empresa/unidade
-  - Descrição do plano/tratamento
-  - Valor total, condições de pagamento, número de parcelas
-- **Boleto**
-  - Identificador do boleto no gateway/banco
-  - Valor, data de vencimento, data de emissão, status (emitido, pago, vencido, cancelado)
-  - Vínculo com atendimento, contrato ou plano
-- **Cobrança automática**
-  - Regras de envio de lembretes (antes e depois do vencimento)
-  - Canais: WhatsApp, e-mail
-  - Histórico de tentativas de cobrança por boleto
-- **Portal do paciente**
-  - Visão dos boletos em aberto, pagos e histórico
-  - Links para download/segunda via
-
-### Regras de negócio principais
-
-- Boletos são sempre vinculados a um contexto (atendimento, contrato, plano), para permitir leitura em dashboards.
-- A automação de cobrança deve:
-  - respeitar limites de tentativas e intervalos configuráveis;
-  - registrar cada lembrete enviado (data, canal, sucesso/erro).
-- A inadimplência deve ser observável em faixas (30, 60, 90 dias) por empresa/unidade.
-- O portal do paciente não deve expor dados clínicos; apenas informações financeiras e documentos relacionados ao pagamento.
-
-### Requisitos funcionais (financeiro)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-FIN-01  | Cadastrar contratos/planos financeiros vinculados a pacientes e atendimentos. |
-| RF-FIN-02  | Gerar boletos automaticamente a partir de contratos, planos ou atendimentos. |
-| RF-FIN-03  | Consultar status de boletos (emitido, pago, vencido, cancelado) no gateway/banco e sincronizar com o sistema. |
-| RF-FIN-04  | Configurar e executar cobrança automática (lembretes pré e pós-vencimento) via WhatsApp e/ou e-mail. |
-| RF-FIN-05  | Exibir visões de inadimplência por faixa de atraso (30, 60, 90 dias) e por empresa/unidade. |
-| RF-FIN-06  | Disponibilizar portal do paciente para consulta e download de boletos. |
-
----
-
-## 2.8. Módulo de Relatórios e Dashboards
-
-### Visão geral
-
-Consolida **indicadores de marketing, operação, clínica e financeiro** em visões simples, pensadas principalmente para donos de clínica e gestores.
-
-### Principais conceitos e dados
-
-- **Painel de funil**
-  - Leads por campanha/canal
-  - Taxa de conversão lead → agendamento → atendimento → boleto pago
-- **Painel de agenda**
-  - Furo de agenda (faltas, cancelamentos)
-  - Ocupação por profissional/unidade
-- **Painel financeiro**
-  - Receita por período, unidade, profissional
-  - Inadimplência por faixa de atraso
-- **Painel de marketing**
-  - Desempenho de campanhas (leads gerados, agendamentos, atendimentos, receita associada)
-
-### Regras de negócio principais
-
-- Relatórios devem trabalhar principalmente sobre dados já consolidados no banco transacional, com possibilidade de sumarizações assíncronas (jobs em background) para períodos maiores.
-- Os filtros principais devem ser: período, empresa/unidade, profissional, campanha.
-- Indicadores financeiros exibidos em relatórios não devem expor detalhes de pacientes além do necessário (respeito a privacidade/LGPD).
-
-### Requisitos funcionais (relatórios)
-
-| ID         | Descrição |
-|------------|-----------|
-| RF-REL-01  | Disponibilizar dashboards de funil (lead → agendamento → atendimento → boleto pago) por período, empresa/unidade e campanha. |
-| RF-REL-02  | Disponibilizar dashboards de agenda (ocupação, faltas, cancelamentos) por profissional e unidade. |
-| RF-REL-03  | Disponibilizar dashboards financeiros (receita, inadimplência por faixa de atraso, recebimentos por plano/tratamento). |
-| RF-REL-04  | Permitir filtros principais (período, empresa/unidade, profissional, campanha) em todos os painéis. |
-| RF-REL-05  | Gerar relatórios exportáveis (CSV/Excel) para análise externa, quando aplicável. |
-
----
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leev Clinic — Apresentacao Comercial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --black: #000000;
+            --white: #FFFFFC;
+            --beige: #BEB7A4;
+            --purple-dark: #1B1540;
+            --gray: #8a8a8a;
+            --gray-light: #c5c5c5;
+            --green: #22c55e;
+        }
+
+        html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
+            overflow-x: hidden;
+        }
+
+        .slide {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px 64px;
+            position: relative;
+            scroll-snap-align: start;
+            overflow: hidden;
+        }
+
+        .slide-content {
+            max-width: 1100px;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .slide-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 80px;
+            align-items: center;
+        }
+
+        .section-label {
+            display: inline-block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--beige);
+            margin-bottom: 20px;
+            opacity: 0.85;
+        }
+
+        .headline {
+            font-size: 3.2rem;
+            font-weight: 700;
+            line-height: 1.12;
+            margin-bottom: 24px;
+            letter-spacing: -1.5px;
+        }
+
+        .headline-xl {
+            font-size: 4.2rem;
+            font-weight: 800;
+            line-height: 1.08;
+            margin-bottom: 32px;
+            letter-spacing: -2px;
+        }
+
+        .sub {
+            font-size: 1.2rem;
+            color: var(--gray-light);
+            line-height: 1.65;
+            font-weight: 400;
+            max-width: 620px;
+        }
+
+        .text-beige { color: var(--beige); }
+        .text-muted { color: var(--gray); }
+
+        .check-list {
+            list-style: none;
+            margin: 36px 0;
+        }
+
+        .check-list li {
+            font-size: 1.05rem;
+            color: var(--gray-light);
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(190,183,164,0.1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .check-list li:last-child { border-bottom: none; }
+
+        .check-list .ico {
+            width: 22px;
+            height: 22px;
+            color: var(--beige);
+            flex-shrink: 0;
+        }
+
+        .card-grid {
+            display: grid;
+            gap: 24px;
+            margin-top: 48px;
+        }
+
+        .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+        .card {
+            background: rgba(27,21,64,0.28);
+            border: 1px solid rgba(190,183,164,0.12);
+            border-radius: 16px;
+            padding: 36px 32px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            background: rgba(27,21,64,0.5);
+            border-color: rgba(190,183,164,0.22);
+            transform: translateY(-4px);
+        }
+
+        .card h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .card p {
+            font-size: 0.92rem;
+            color: var(--gray);
+            line-height: 1.55;
+        }
+
+        .card .card-ico {
+            width: 36px;
+            height: 36px;
+            color: var(--beige);
+            margin-bottom: 16px;
+        }
+
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+            margin-top: 56px;
+        }
+
+        .stat { text-align: center; }
+
+        .stat-number {
+            font-size: 3.4rem;
+            font-weight: 800;
+            color: var(--beige);
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.88rem;
+            color: var(--gray);
+        }
+
+        .journey {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 64px;
+            position: relative;
+        }
+
+        .journey::before {
+            content: '';
+            position: absolute;
+            top: 26px;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--beige), var(--purple-dark));
+            opacity: 0.3;
+        }
+
+        .journey-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            z-index: 1;
+            flex: 1;
+        }
+
+        .journey-dot {
+            width: 52px;
+            height: 52px;
+            background: var(--purple-dark);
+            border: 2px solid var(--beige);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .journey-dot svg {
+            width: 22px;
+            height: 22px;
+            color: var(--beige);
+        }
+
+        .journey-step span {
+            font-size: 0.82rem;
+            color: var(--gray-light);
+            max-width: 90px;
+        }
+
+        .highlight-card {
+            background: linear-gradient(135deg, rgba(190,183,164,0.1) 0%, rgba(27,21,64,0.35) 100%);
+            border: 2px solid rgba(190,183,164,0.3);
+            border-radius: 20px;
+            padding: 48px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .highlight-card h3 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .highlight-card p {
+            font-size: 1.05rem;
+            color: var(--gray-light);
+            line-height: 1.6;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-top: 48px;
+        }
+
+        .pricing-card {
+            background: rgba(27,21,64,0.25);
+            border: 1px solid rgba(190,183,164,0.15);
+            border-radius: 16px;
+            padding: 40px 32px;
+            transition: all 0.3s ease;
+        }
+
+        .pricing-card.featured {
+            background: linear-gradient(135deg, rgba(190,183,164,0.15), rgba(27,21,64,0.4));
+            border: 2px solid var(--beige);
+            transform: scale(1.04);
+            position: relative;
+        }
+
+        .pricing-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--beige);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+
+        .pricing-card .price {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin: 12px 0 8px;
+        }
+
+        .pricing-card .price small {
+            font-size: 1rem;
+            font-weight: 400;
+            color: var(--gray);
+        }
+
+        .pricing-card .desc {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-bottom: 28px;
+        }
+
+        .pricing-card ul {
+            list-style: none;
+            text-align: left;
+        }
+
+        .pricing-card li {
+            font-size: 0.88rem;
+            color: var(--gray-light);
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(190,183,164,0.08);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pricing-card li:last-child { border-bottom: none; }
+
+        .pricing-card li svg {
+            width: 16px;
+            height: 16px;
+            color: var(--beige);
+            flex-shrink: 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .badge-popular {
+            background: var(--beige);
+            color: var(--black);
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 48px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 40px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--beige);
+            color: var(--black);
+        }
+
+        .btn-primary:hover {
+            background: var(--white);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--white);
+            border: 1px solid rgba(255,255,255,0.25);
+        }
+
+        .btn-outline:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .contact-row {
+            display: flex;
+            gap: 48px;
+            margin-top: 48px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--gray-light);
+            font-size: 0.92rem;
+        }
+
+        .contact-item svg {
+            width: 18px;
+            height: 18px;
+            color: var(--beige);
+        }
+
+        .divider {
+            width: 48px;
+            height: 3px;
+            background: var(--beige);
+            border-radius: 2px;
+            margin: 24px 0 32px;
+            opacity: 0.6;
+        }
+
+        .bg-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(180px);
+            opacity: 0.06;
+            pointer-events: none;
+        }
+
+        .bg-glow.top-right { top: -200px; right: -200px; background: var(--beige); }
+        .bg-glow.bottom-left { bottom: -200px; left: -200px; background: var(--purple-dark); }
+        .bg-glow.center { top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--beige); opacity: 0.04; }
+
+        .nav-dots {
+            position: fixed;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(190,183,164,0.25);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .nav-dot:hover,
+        .nav-dot.active {
+            background: var(--beige);
+            transform: scale(1.3);
+        }
+
+        .slide-counter {
+            position: fixed;
+            bottom: 24px;
+            left: 28px;
+            font-size: 0.82rem;
+            color: var(--gray);
+            z-index: 100;
+        }
+
+        .slide-counter span { color: var(--beige); font-weight: 600; }
+
+        .kb-hint {
+            position: fixed;
+            bottom: 24px;
+            right: 60px;
+            font-size: 0.72rem;
+            color: var(--gray);
+            z-index: 100;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 1024px) {
+            .slide { padding: 48px 32px; }
+            .headline { font-size: 2.4rem; }
+            .headline-xl { font-size: 3rem; }
+            .slide-split { grid-template-columns: 1fr; gap: 40px; }
+            .card-grid.cols-3 { grid-template-columns: 1fr 1fr; }
+            .pricing-grid { grid-template-columns: 1fr; }
+            .pricing-card.featured { transform: none; }
+            .stat-row { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .slide { padding: 32px 20px; }
+            .headline { font-size: 1.8rem; }
+            .headline-xl { font-size: 2.2rem; }
+            .sub { font-size: 1rem; }
+            .card-grid.cols-3, .card-grid.cols-2 { grid-template-columns: 1fr; }
+            .nav-dots { display: none; }
+            .journey { flex-wrap: wrap; gap: 20px; }
+            .journey::before { display: none; }
+            .stat-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="nav-dots" id="navDots"></nav>
+    <div class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides"></span></div>
+    <div class="kb-hint">Setas para navegar</div>
+
+    <!-- 1. CAPA -->
+    <section class="slide" id="slide-0">
+        <div class="bg-glow top-right"></div>
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Leev Clinic</span>
+            <h1 class="headline-xl">
+                O sistema que organiza,<br>capta e faz sua clinica<br><span class="text-beige">crescer com controle.</span>
+            </h1>
+            <p class="sub" style="margin: 0 auto;">
+                Do lead ao boleto pago, tudo em um unico lugar.
+            </p>
+        </div>
+    </section>
+
+    <!-- 2. PARA QUEM -->
+    <section class="slide" id="slide-1">
+        <div class="bg-glow bottom-left"></div>
+        <div class="slide-content">
+            <span class="section-label">Para quem e</span>
+            <h2 class="headline">Isso e para clinicas que...</h2>
+
+            <ul class="check-list">
+                <li>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Ja tem pacientes, mas sentem que a operacao nao aguenta crescer
+                </li>
+                <li>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Dependem de planilha, WhatsApp e memoria para manter tudo funcionando
+                </li>
+                <li>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Querem captar mais pacientes sem perder o controle do dia a dia
+                </li>
+                <li>
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    Sabem que precisam de um sistema, mas nao querem algo generico
+                </li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- 3. O PROBLEMA -->
+    <section class="slide" id="slide-2">
+        <div class="bg-glow center"></div>
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">O problema real</span>
+            <h2 class="headline-xl">
+                Agenda cheia<br><span class="text-beige">não significa clinica organizada.</span>
+            </h2>
+            <p class="sub" style="margin: 0 auto;">
+                Quando a operacao não acompanha, crescer só aumenta o caos: retrabalho, informação perdida é dinheiro deixado na mesa.
+            </p>
+        </div>
+    </section>
+
+    <!-- 4. JORNADA DO PACIENTE -->
+    <section class="slide" id="slide-3">
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Visão Leev</span>
+            <h2 class="headline-xl">
+                Paciente não é evento.<br><span class="text-beige">É uma linha do tempo.</span>
+            </h2>
+
+            <div class="journey">
+                <div class="journey-step">
+                    <div class="journey-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </div>
+                    <span>Lead chega</span>
+                </div>
+                <div class="journey-step">
+                    <div class="journey-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+                    </div>
+                    <span>Agendamento</span>
+                </div>
+                <div class="journey-step">
+                    <div class="journey-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <span>Atendimento</span>
+                </div>
+                <div class="journey-step">
+                    <div class="journey-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    </div>
+                    <span>Financeiro</span>
+                </div>
+                <div class="journey-step">
+                    <div class="journey-dot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </div>
+                    <span>Retorno</span>
+                </div>
+            </div>
+
+            <p class="text-muted" style="margin-top: 48px; font-size: 0.95rem;">
+                Cada paciente tem uma história. O Leev guarda essa história.
+            </p>
+        </div>
+    </section>
+
+    <!-- 5. MARKETING — O OURO -->
+    <section class="slide" id="slide-4">
+        <div class="bg-glow top-right"></div>
+        <div class="slide-content">
+            <span class="section-label">O ouro do sistema</span>
+            <h2 class="headline">
+                Um gestor de tráfego<br><span class="text-beige">automático dentro da clinica.</span>
+            </h2>
+            <p class="sub">
+                A clinica solicita a campanha. O Leev identifica os leads pelo WhatsApp, inicia o atendimento automatico e agenda. Sem depender de ninguem lembrando de responder.
+            </p>
+
+            <div class="card-grid cols-3" style="margin-top: 40px;">
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <h4>Campanhas automáticas</h4>
+                    <p>Solicite a campanha e os leads ja começam a chegar na agenda, tudo integrado.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                    <h4>Atendimento via WhatsApp</h4>
+                    <p>O sistema identifica o lead e inicia a conversa automatica para agendar.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    <h4>Lembretes automaticos</h4>
+                    <p>O robo avisa o paciente quando foi agendado e lembra antes da consulta.</p>
+                </div>
+            </div>
+
+            <div class="highlight-card" style="margin-top: 32px;">
+                <p style="font-size: 1.1rem;">O unico papel da clinica: <strong style="color: var(--beige);">solicitar a campanha e acompanhar a agenda.</strong><br>O resto o Leev faz.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. AGENDA + PACIENTE -->
+    <section class="slide" id="slide-5">
+        <div class="slide-content">
+            <span class="section-label">Gestao do dia a dia</span>
+            <h2 class="headline">
+                Do lead ao prontuario,<br><span class="text-beige">tudo em um so lugar.</span>
+            </h2>
+
+            <div class="card-grid cols-2" style="margin-top: 40px;">
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <h4>Agenda inteligente</h4>
+                    <p>Visão diária e semanal, bloqueio de horários, confirmação e evidências de consulta em um unico painel.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    <h4>Paciente e linha do tempo</h4>
+                    <p>Historico completo de tudo que aconteceu com o paciente, em ordem, facil de encontrar.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <h4>Prontuario digital</h4>
+                    <p>Atestados e receituarios gerados com logo em marca d'agua e assinatura digital, enviados direto no WhatsApp.</p>
+                </div>
+                <div class="card">
+                    <svg class="card-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                    <h4>Odontograma e anexos</h4>
+                    <p>Odontograma visual interativo, anexos de exames e documentos por paciente, tudo centralizado.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. FINANCEIRO -->
+    <section class="slide" id="slide-6">
+        <div class="bg-glow bottom-left"></div>
+        <div class="slide-content">
+            <div class="slide-split">
+                <div>
+                    <span class="section-label">Financeiro</span>
+                    <h2 class="headline">
+                        Boletos, cobranca<br>e controle.<br><span class="text-beige">Tudo automatico.</span>
+                    </h2>
+                    <p class="sub">
+                        Geracao automatica de boletos vinculados aos atendimentos, cobranca automatica, acompanhamento de pagamentos e gestao completa da inadimplencia em um unico painel.
+                    </p>
+                </div>
+                <div>
+                    <ul class="check-list">
+                        <li>
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Emissao automatica de boletos
+                        </li>
+                        <li>
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Cobranca automatica via WhatsApp
+                        </li>
+                        <li>
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Controle de inadimplencia (30, 60, 90 dias)
+                        </li>
+                        <li>
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Portal do paciente para consultar boletos
+                        </li>
+                        <li>
+                            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            Sincronizacao automatica diaria
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 8. DASHBOARD -->
+    <section class="slide" id="slide-7">
+        <div class="bg-glow center"></div>
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Dashboard</span>
+            <h2 class="headline-xl">
+                Tudo vira dado.<br><span class="text-beige">Tudo e mensuravel.</span>
+            </h2>
+            <p class="sub" style="margin: 0 auto;">
+                Marketing, agenda, pacientes, prontuario e financeiro: tudo metrificado, calculado e apresentado em dados para voce tomar decisao com seguranca.
+            </p>
+
+            <div class="card-grid cols-3" style="margin-top: 48px;">
+                <div class="card" style="text-align: center;">
+                    <svg class="card-ico" style="margin: 0 auto 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <h4>Leads e conversao</h4>
+                    <p>Quantos entraram, quantos agendaram, quais campanhas performam melhor.</p>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <svg class="card-ico" style="margin: 0 auto 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <h4>Receita e inadimplencia</h4>
+                    <p>Impacto real em receita, boletos pagos e acompanhamento financeiro.</p>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <svg class="card-ico" style="margin: 0 auto 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <h4>Funil completo</h4>
+                    <p>Do lead ao boleto pago, em poucos segundos voce entende se o funil esta rodando.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 9. RESULTADOS -->
+    <section class="slide" id="slide-8">
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Resultados</span>
+            <h2 class="headline">
+                O que muda para<br><span class="text-beige">a sua clinica</span>
+            </h2>
+
+            <div class="card-grid cols-2" style="max-width: 800px; margin: 40px auto 0;">
+                <div class="card" style="text-align: center; padding: 40px;">
+                    <h4 style="font-size: 1.15rem;">Toda a gestao em um unico sistema</h4>
+                    <p>Do marketing ao financeiro, sem alternar entre ferramentas.</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 40px;">
+                    <h4 style="font-size: 1.15rem;">Mais organizacao no dia a dia</h4>
+                    <p>Menos planilha, menos retrabalho, menos informacao perdida.</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 40px;">
+                    <h4 style="font-size: 1.15rem;">Mais pacientes com marketing integrado</h4>
+                    <p>Campanhas inteligentes com gestor de trafego interno para encher a agenda.</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 40px;">
+                    <h4 style="font-size: 1.15rem;">Controle financeiro assertivo</h4>
+                    <p>Boletos, cobranca e receita controlados para a realidade da sua clinica.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 10. PLANOS -->
+    <section class="slide" id="slide-9">
+        <div class="bg-glow top-right"></div>
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Planos</span>
+            <h2 class="headline">O caminho certo para a sua clinica</h2>
+
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Leev Base</h3>
+                    <p class="desc">Para clinicas que precisam organizar o dia a dia.</p>
+                    <ul>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Agenda inteligente</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Gestao de pacientes</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Prontuario digital</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Historico e linha do tempo</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Suporte via WhatsApp</li>
+                    </ul>
+                </div>
+
+                <div class="pricing-card featured">
+                    <span class="badge badge-popular">Mais popular</span>
+                    <h3 style="margin-top: 12px;">Leev Controle</h3>
+                    <p class="desc">Organizacao + gestao + captacao ativa de pacientes.</p>
+                    <ul>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Tudo do Base +</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Financeiro completo</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> WhatsApp bidirecional</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Contratos e assinatura digital</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Dashboard em tempo real</li>
+                    </ul>
+                </div>
+
+                <div class="pricing-card">
+                    <h3>Leev Performance</h3>
+                    <p class="desc">Para clinicas que querem escalar com metodo.</p>
+                    <ul>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Tudo do Controle +</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Marketing integrado</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> CRM completo + Pipeline</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Validacao biometrica</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Suporte prioritario</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 11. PROXIMO PASSO -->
+    <section class="slide" id="slide-10">
+        <div class="bg-glow bottom-left"></div>
+        <div class="slide-content" style="text-align: center;">
+            <span class="section-label">Proximo passo</span>
+            <h2 class="headline-xl">
+                7 dias de teste.<br><span class="text-beige">Sem compromisso.</span>
+            </h2>
+            <p class="sub" style="margin: 0 auto 48px;">
+                O proximo passo nao e fechar nada agora. E configurar o Leev na sua operacao real e validar na pratica.
+            </p>
+
+            <div class="card-grid cols-3" style="max-width: 900px; margin: 0 auto;">
+                <div class="card" style="text-align: center; padding: 36px 24px;">
+                    <div style="font-size: 2.4rem; font-weight: 800; color: var(--beige); margin-bottom: 12px;">1</div>
+                    <h4>Liberamos a demo</h4>
+                    <p>Configuramos o Leev para o fluxo real da sua clinica.</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 36px 24px;">
+                    <div style="font-size: 2.4rem; font-weight: 800; color: var(--beige); margin-bottom: 12px;">2</div>
+                    <h4>Seu time testa</h4>
+                    <p>Agenda, financeiro e gestao usam o sistema por 7 dias.</p>
+                </div>
+                <div class="card" style="text-align: center; padding: 36px 24px;">
+                    <div style="font-size: 2.4rem; font-weight: 800; color: var(--beige); margin-bottom: 12px;">3</div>
+                    <h4>Decidimos juntos</h4>
+                    <p>No 8o dia, uma call rapida para avaliar o feedback e decidir.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 12. CTA / CONTATO -->
+    <section class="slide" id="slide-11">
+        <div class="bg-glow center"></div>
+        <div class="slide-content" style="text-align: center;">
+            <h2 class="headline-xl">
+                Pronto para ver o Leev<br><span class="text-beige">na pratica?</span>
+            </h2>
+            <p class="sub" style="margin: 0 auto 16px;">
+                Agende uma conversa e descubra como organizar, captar e crescer com controle.
+            </p>
+
+            <div class="cta-buttons">
+                <a href="#" class="btn btn-primary">Agendar conversa</a>
+                <a href="#" class="btn btn-outline">Falar no WhatsApp</a>
+            </div>
+
+            <div class="contact-row">
+                <div class="contact-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span>(41) 99810-7937</span>
+                </div>
+                <div class="contact-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <span>bruno.sandoval@investmoneysa.com.br</span>
+                </div>
+                <div class="contact-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <span>app.leevclinic.com.br</span>
+                </div>
+            </div>
+
+            <p class="text-muted" style="margin-top: 48px; font-size: 0.82rem;">
+                100% na nuvem &middot; LGPD compliant &middot; Suporte por WhatsApp
+            </p>
+        </div>
+    </section>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const total = slides.length;
+        document.getElementById('totalSlides').textContent = total;
+
+        const nav = document.getElementById('navDots');
+        for (let i = 0; i < total; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+            dot.dataset.slide = i;
+            nav.appendChild(dot);
+        }
+
+        const dots = document.querySelectorAll('.nav-dot');
+        const counter = document.getElementById('currentSlide');
+
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const idx = Array.from(slides).indexOf(entry.target);
+                    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+                    counter.textContent = idx + 1;
+                }
+            });
+        }, { threshold: 0.5 });
+
+        slides.forEach(s => observer.observe(s));
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                document.getElementById('slide-' + dot.dataset.slide).scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+
+        document.addEventListener('keydown', e => {
+            const cur = parseInt(counter.textContent, 10) - 1;
+            if (['ArrowDown', 'PageDown', ' '].includes(e.key)) {
+                e.preventDefault();
+                if (cur < total - 1) document.getElementById('slide-' + (cur + 1)).scrollIntoView({ behavior: 'smooth' });
+            }
+            if (['ArrowUp', 'PageUp'].includes(e.key)) {
+                e.preventDefault();
+                if (cur > 0) document.getElementById('slide-' + (cur - 1)).scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    </script>
+
+</body>
+</html>
