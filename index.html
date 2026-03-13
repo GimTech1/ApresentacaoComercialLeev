@@ -1,0 +1,390 @@
+# 2. Módulos do Sistema
+
+Este documento detalha os módulos do CRM Leev Clinic no âmbito da Análise de Requisitos. Os dois primeiros módulos (Empresas e Usuários) formam a base de multi-tenancy e controle de acesso.
+
+---
+
+## 2.1. Módulo de Empresas (Clínicas)
+
+### Visão geral
+
+Representa as **clínicas/clientes** que utilizam o sistema. É a unidade básica de multi-tenancy: cada empresa possui suas próprias configurações, plano contratado, integrações e regras de operação.
+
+### Principais dados da empresa
+
+- **Identificação e contato**
+  - Nome da clínica
+  - CNPJ (ou CPF quando aplicável)
+  - Telefone(s) e e-mail principal
+  - Endereço (cidade, UF, país)
+  - Logo (armazenado em MinIO ou equivalente)
+- **Configuração comercial**
+  - Plano atual: Base, Controle ou Performance
+  - Status: trial, ativo, suspenso, cancelado
+  - Datas: início do contrato, fim de contrato, fim do trial
+  - Fuso horário e formato de data/hora
+- **Configuração operacional**
+  - Horário de funcionamento por dia da semana
+  - Regras de encaixe e bloqueio de agenda
+  - Antecedência mínima para agendamento e remarcação
+- **Configuração de marketing**
+  - Canais habilitados (WhatsApp, formulários, etc.)
+  - Horários em que a clínica deseja receber leads na agenda
+  - Modelos de mensagem padrão (primeira abordagem, follow-up)
+- **Configuração financeira**
+  - Parâmetros de geração de boletos (banco, carteira, instruções)
+  - Política de cobrança (quantidade de lembretes, intervalos, canais)
+- **LGPD e governança**
+  - Responsável LGPD da clínica (quando aplicável)
+  - Preferências de retenção de dados
+
+### Regras de negócio principais
+
+- Uma empresa pode ter várias **unidades/filiais** (opcional), cada uma com agenda e profissionais próprios.
+- Uma empresa possui vários **usuários**, cada um com permissões específicas (ver Módulo de Usuários).
+- O **plano** da empresa define quais módulos estão disponíveis (ex.: Marketing completo apenas em Controle/Performance) e limites de uso (usuários, profissionais, campanhas ativas), quando aplicável.
+- Apenas empresas em status **trial** ou **ativo** podem captar leads, agendar e gerar boletos; em **cancelado**, o acesso a dados históricos pode ser mantido conforme política de retenção.
+
+### Requisitos funcionais (empresa)
+
+| ID        | Descrição |
+|-----------|-----------|
+| RF-EMP-01 | Cadastrar, editar e inativar empresas (clínicas). |
+| RF-EMP-02 | Definir plano, status e datas de vigência. |
+| RF-EMP-03 | Configurar horários de funcionamento e regras básicas de agenda por empresa/unidade. |
+| RF-EMP-04 | Configurar canais e horários de captação de leads (Marketing). |
+| RF-EMP-05 | Configurar parâmetros de boletos (banco, carteira, instruções padrão). |
+| RF-EMP-06 | Anexar logo e dados visuais para uso em documentos (receitas, atestados, boletos, portal do paciente). |
+| RF-EMP-07 | Registrar e exibir histórico de alterações críticas (plano, status, parâmetros financeiros). |
+
+---
+
+## 2.2. Módulo de Usuários
+
+### Visão geral
+
+Gerencia **quem** acessa o sistema e **o que cada um pode fazer** em uma ou mais empresas. Suporta cenários em que um mesmo usuário atua em várias clínicas, com perfis e permissões diferentes por empresa (SDR, recepção, médico/dentista, financeiro, gestor).
+
+### Principais dados do usuário
+
+- **Autenticação**
+  - Nome completo
+  - E-mail (login)
+  - Senha (armazenada em hash)
+  - Status: ativo, inativo, convite pendente
+- **Perfil**
+  - Tipo de usuário (rótulo principal: SDR, Recepção, Médico/Dentista, Financeiro, Gestor, Admin do sistema)
+  - Foto/avatar (opcional)
+  - Idioma e preferências (fuso horário, notificações)
+- **Vínculo com empresas**
+  - Para cada empresa: papel/perfil e conjunto de permissões granulares (ver abaixo).
+
+### Modelo de permissões (multi-empresa)
+
+- Um usuário pode estar vinculado a **uma ou várias empresas**.
+- Para cada vínculo usuário–empresa, define-se:
+  - **Papel principal** (ex.: Gestor, Recepção, Médico, Financeiro).
+  - **Permissões por módulo**, por exemplo:
+    - **Marketing**: visualizar campanhas e leads; criar/editar campanhas; pausar/reativar campanhas.
+    - **Agenda**: visualizar agenda; criar/editar/remarcar agendamentos; bloquear horários.
+    - **Pacientes/Prontuário**: visualizar dados básicos do paciente; visualizar prontuário completo (quando perfil médico); editar prontuário; anexar documentos.
+    - **Financeiro**: visualizar boletos; gerar boletos; registrar recebimentos manuais.
+    - **Relatórios**: acesso a dashboards consolidados.
+- Usuários **não médicos** podem ter acesso restrito a dados sensíveis de prontuário (ex.: apenas status do atendimento, sem conteúdo clínico detalhado).
+
+### Regras de negócio principais
+
+- Um usuário **não acessa** uma empresa se não tiver vínculo ativo com ela ou estiver marcado como inativo para aquela empresa.
+- Permissões são sempre avaliadas **por empresa**; não existe “super usuário global” sem contexto de empresa, exceto Admin do sistema (quando aplicável).
+- Ações sensíveis exigem perfil específico (ex.: edição de prontuário completo apenas para perfis médicos/dentistas autorizados; alteração de plano da empresa apenas para gestor/dono ou admin).
+- **Auditoria**: toda ação sensível (acesso a prontuário, geração de boleto, alteração de permissões) deve ser registrada com usuário, empresa, data/hora e ação.
+
+### Requisitos funcionais (usuários)
+
+| ID        | Descrição |
+|-----------|-----------|
+| RF-USR-01 | Cadastrar usuário com e-mail, senha e tipo de usuário. |
+| RF-USR-02 | Convidar usuário por e-mail para acessar uma empresa. |
+| RF-USR-03 | Associar usuário a uma ou mais empresas, definindo papel e permissões em cada uma. |
+| RF-USR-04 | Ativar/inativar usuário no sistema e/ou em uma empresa específica. |
+| RF-USR-05 | Definir e alterar permissões granulares por módulo (Marketing, Agenda, Pacientes, Prontuário, Financeiro, Relatórios). |
+| RF-USR-06 | Registrar log de acesso e ações sensíveis (principalmente prontuário e financeiro). |
+| RF-USR-07 | Permitir recuperação de senha e troca segura de credenciais. |
+
+---
+
+## 2.3. Módulo de Marketing (Captação de Leads)
+
+### Visão geral
+
+Responsável por **trazer oportunidades novas para a clínica** e organizar o funil de leads desde a origem (campanha) até o momento em que o lead está pronto para agendar. É onde o Leev se posiciona como um “gestor de tráfego automático” dentro da clínica.
+
+### Principais conceitos e dados
+
+- **Campanha de marketing**
+  - Nome da campanha
+  - Empresa/unidade vinculada
+  - Canal (WhatsApp, formulário, landing page, remarketing em carteira antiga, outros)
+  - Datas de início e fim
+  - Orçamento estimado (opcional)
+  - Status: rascunho, ativa, pausada, encerrada
+- **Origem de lead**
+  - Identificador técnico (ID de mensagem do WhatsApp, UTM, formulário específico)
+  - Canal e campanha associados
+- **Lead**
+  - Dados básicos: nome (quando disponível), telefone, e-mail (opcional)
+  - Origem (campanha/canal)
+  - Situação no funil: novo, em atendimento automático, aguardando resposta, pronto para agendar, perdido, convertido em paciente
+  - Timestamps importantes (entrada, primeira resposta, agendamento, perda)
+- **Regras de atendimento automático**
+  - Fluxos de mensagens automáticas por campanha
+  - Janelas de horário em que o robô pode interagir
+  - Limites de tentativas e tempo entre tentativas
+  - Modelos de mensagem personalizáveis por campanha, incluindo campanhas de **remarketing para carteira antiga** (ex.: pacientes que não voltam há X meses)
+
+### Regras de negócio principais
+
+- Todo lead deve estar vinculado a **uma empresa** e, quando possível, a **uma campanha** específica.
+- O sistema deve registrar o **ID da conversa no WhatsApp** ou identificador equivalente para rastrear custos e mensagens.
+- O fluxo automático de mensagens respeita:
+  - janela de 24 horas de mensagens iniciadas pelo paciente;
+  - regras de janelas pagas da Meta, quando for disparo ativo.
+- Quando um lead atinge condição de “pronto para agendar”, ele:
+  - é encaminhado para o módulo de **Agenda**, já com contexto básico;
+  - mantém o vínculo com a campanha para análise de resultado.
+- A clínica pode pausar uma campanha a qualquer momento; novos leads deixam de ser aceitos por aquela origem.
+
+### Requisitos funcionais (marketing)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-MKT-01  | Cadastrar, editar, ativar, pausar e encerrar campanhas de marketing por empresa/unidade. |
+| RF-MKT-02  | Definir canal, origem técnica (ex.: ID de mensagem/landing page) e janelas de horário de atendimento automático. |
+| RF-MKT-03  | Registrar leads com origem (campanha, canal, identificador técnico). |
+| RF-MKT-04  | Executar fluxo automático de mensagens para leads novos, respeitando janelas e regras configuradas. |
+| RF-MKT-05  | Atualizar o status do lead no funil (novo, em atendimento, pronto para agendar, perdido, convertido). |
+| RF-MKT-06  | Integrar com o módulo de Agenda para criar uma oportunidade de agendamento quando o lead estiver pronto. |
+| RF-MKT-07  | Registrar métricas básicas de campanha (leads recebidos, leads em atendimento, leads que agendaram). |
+| RF-MKT-08  | Permitir campanhas de remarketing para carteira antiga de pacientes (ex.: filtrando por tempo sem retorno) com personalização de mensagem por campanha. |
+
+---
+
+## 2.4. Módulo de Agenda
+
+### Visão geral
+
+Centraliza **todos os agendamentos da clínica**, conectando leads vindos do Marketing com os profissionais, salas e horários disponíveis. É a visão do dia a dia da recepção e do time clínico.
+
+### Principais conceitos e dados
+
+- **Agenda de profissional/unidade**
+  - Empresa/unidade
+  - Profissional responsável
+  - Grade de horários padrão (baseada na configuração da empresa)
+- **Agendamento**
+  - Paciente (ou lead, quando ainda não convertido)
+  - Data, horário de início e duração prevista
+  - Profissional e, opcionalmente, sala
+  - Origem (lead de campanha X, retorno, walk-in, indicação)
+  - Status: marcado, confirmado, em atendimento, concluído, remarcado, cancelado, falta
+- **Regras de confirmação e lembretes**
+  - Janelas e canais de envio (WhatsApp)
+  - Mensagens padrão (configuradas por empresa)
+- **Bloqueios e encaixes**
+  - Bloqueios manuais por horário/dia
+  - Marcação de encaixe (sobreposição controlada)
+
+### Regras de negócio principais
+
+- A agenda só pode ser criada dentro da janela de funcionamento definida na **empresa** (ou unidade), respeitando bloqueios adicionais.
+- Um lead vindo do módulo de Marketing pode gerar:
+  - um agendamento diretamente;
+  - ou uma “pré-reserva” de horário até a confirmação do paciente.
+- O robô de lembrete:
+  - avisa o paciente quando o horário é agendado;
+  - envia lembretes configuráveis (por exemplo, no dia e alguns dias antes) para reduzir faltas.
+- Alterações sensíveis (cancelar, remarcar, registrar falta) devem ficar registradas com usuário, data e motivo.
+
+### Requisitos funcionais (agenda)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-AGD-01  | Gerenciar agendas por profissional/unidade, com base no horário de funcionamento da empresa. |
+| RF-AGD-02  | Criar, editar, remarcar e cancelar agendamentos. |
+| RF-AGD-03  | Permitir marcação de encaixes e bloqueios de horários. |
+| RF-AGD-04  | Receber leads “prontos para agendar” do módulo de Marketing e facilitar a conversão em agendamento. |
+| RF-AGD-05  | Enviar confirmações e lembretes automáticos de agendamento via WhatsApp, conforme regras da empresa. |
+| RF-AGD-06  | Registrar status do atendimento (marcado, confirmado, concluído, falta, cancelado) e histórico de alterações. |
+| RF-AGD-07  | Disponibilizar visão de dia/semana da agenda para recepção e profissionais. |
+
+---
+
+## 2.5. Módulo de Pacientes
+
+### Visão geral
+
+Centraliza o cadastro de **pacientes** e sua relação com a clínica ao longo do tempo. É a base para a linha do tempo do paciente, integração com prontuário, agenda e financeiro.
+
+### Principais conceitos e dados
+
+- **Paciente**
+  - Dados pessoais: nome completo, data de nascimento, documento (CPF/RG ou equivalente)
+  - Contatos: telefone(s), e-mail, endereço
+  - Preferências de contato (WhatsApp, e-mail, telefone)
+  - Dados adicionais relevantes à clínica (ex.: convênio/plano, responsável financeiro)
+- **Histórico de relacionamento**
+  - Primeiro contato (origem, data)
+  - Data do primeiro agendamento e do primeiro atendimento
+  - Último atendimento, última ausência/falta, última campanha de remarketing recebida
+- **Vínculos**
+  - Empresa/unidade principal
+  - Profissionais mais frequentes (quando aplicável)
+
+### Regras de negócio principais
+
+- Um paciente pode estar vinculado a **uma ou mais empresas** (ex.: redes/grupos), mantendo histórico separado por empresa.
+- Informações sensíveis (ex.: dados clínicos) são mantidas no módulo de **Prontuário**, mas a linha do tempo do paciente pode exibir resumos de eventos (atendimento, documento gerado, boleto emitido) sem conteúdo clínico detalhado.
+- O cadastro de paciente pode ser:
+  - criado a partir de um lead (conversão Marketing → Paciente);
+  - criado diretamente pela recepção/médico;
+  - atualizado automaticamente ao longo dos atendimentos.
+
+### Requisitos funcionais (pacientes)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-PAC-01  | Cadastrar, editar e inativar pacientes por empresa/unidade. |
+| RF-PAC-02  | Converter um lead em paciente, mantendo o vínculo com a origem/campanha. |
+| RF-PAC-03  | Visualizar a linha do tempo de eventos do paciente (agendamentos, atendimentos, documentos, boletos). |
+| RF-PAC-04  | Pesquisar pacientes por nome, documento, telefone ou e-mail. |
+| RF-PAC-05  | Registrar e atualizar preferências de contato do paciente. |
+
+---
+
+## 2.6. Módulo de Prontuário
+
+### Visão geral
+
+Responsável pelo **registro clínico estruturado** de cada paciente, incluindo evoluções, odontograma, anexos e documentos gerados (receitas, atestados), garantindo rastreabilidade e segurança.
+
+### Principais conceitos e dados
+
+- **Prontuário do paciente**
+  - Fichas de anamnese
+  - Evoluções clínicas (data, profissional, descrição, procedimentos)
+  - Odontograma visual (no caso de odontologia), com histórico por dente/região
+- **Documentos clínicos**
+  - Receituários e atestados gerados com:
+    - logo da clínica em marca d’água
+    - assinatura digital do profissional (quando suportado)
+    - metadados (data, profissional, paciente)
+  - Envio automático via WhatsApp para o paciente quando configurado
+- **Anexos**
+  - Exames, imagens, PDFs e outros arquivos vinculados ao paciente/atendimento
+
+### Regras de negócio principais
+
+- O acesso ao conteúdo do prontuário é restrito a perfis autorizados (principalmente médicos/dentistas).
+- Toda alteração em prontuário deve ser auditável (quem alterou, quando, o que foi alterado).
+- Documentos gerados (receitas, atestados) devem poder ser:
+  - visualizados no sistema;
+  - impressos/baixados em PDF;
+  - enviados diretamente ao paciente via WhatsApp.
+- Odontograma deve guardar histórico de alterações, não apenas o estado atual.
+
+### Requisitos funcionais (prontuário)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-PRT-01  | Registrar e editar anamnese e evoluções clínicas por paciente. |
+| RF-PRT-02  | Manter odontograma visual com histórico de procedimentos por dente/região. |
+| RF-PRT-03  | Anexar e visualizar arquivos (exames, imagens, PDFs) vinculados ao paciente/atendimento. |
+| RF-PRT-04  | Gerar receituários e atestados com logo em marca d’água e, quando aplicável, assinatura digital do profissional. |
+| RF-PRT-05  | Enviar documentos clínicos ao paciente via WhatsApp, quando autorizado pela clínica. |
+| RF-PRT-06  | Registrar trilha de auditoria para acessos e alterações em prontuário. |
+
+---
+
+## 2.7. Módulo Financeiro
+
+### Visão geral
+
+Controla **contratos, boletos, recebíveis e inadimplência**, conectando-se diretamente com atendimentos e planos de tratamento. É o elo entre o que foi feito na clínica e o que foi efetivamente recebido.
+
+### Principais conceitos e dados
+
+- **Contrato/plano financeiro**
+  - Paciente, empresa/unidade
+  - Descrição do plano/tratamento
+  - Valor total, condições de pagamento, número de parcelas
+- **Boleto**
+  - Identificador do boleto no gateway/banco
+  - Valor, data de vencimento, data de emissão, status (emitido, pago, vencido, cancelado)
+  - Vínculo com atendimento, contrato ou plano
+- **Cobrança automática**
+  - Regras de envio de lembretes (antes e depois do vencimento)
+  - Canais: WhatsApp, e-mail
+  - Histórico de tentativas de cobrança por boleto
+- **Portal do paciente**
+  - Visão dos boletos em aberto, pagos e histórico
+  - Links para download/segunda via
+
+### Regras de negócio principais
+
+- Boletos são sempre vinculados a um contexto (atendimento, contrato, plano), para permitir leitura em dashboards.
+- A automação de cobrança deve:
+  - respeitar limites de tentativas e intervalos configuráveis;
+  - registrar cada lembrete enviado (data, canal, sucesso/erro).
+- A inadimplência deve ser observável em faixas (30, 60, 90 dias) por empresa/unidade.
+- O portal do paciente não deve expor dados clínicos; apenas informações financeiras e documentos relacionados ao pagamento.
+
+### Requisitos funcionais (financeiro)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-FIN-01  | Cadastrar contratos/planos financeiros vinculados a pacientes e atendimentos. |
+| RF-FIN-02  | Gerar boletos automaticamente a partir de contratos, planos ou atendimentos. |
+| RF-FIN-03  | Consultar status de boletos (emitido, pago, vencido, cancelado) no gateway/banco e sincronizar com o sistema. |
+| RF-FIN-04  | Configurar e executar cobrança automática (lembretes pré e pós-vencimento) via WhatsApp e/ou e-mail. |
+| RF-FIN-05  | Exibir visões de inadimplência por faixa de atraso (30, 60, 90 dias) e por empresa/unidade. |
+| RF-FIN-06  | Disponibilizar portal do paciente para consulta e download de boletos. |
+
+---
+
+## 2.8. Módulo de Relatórios e Dashboards
+
+### Visão geral
+
+Consolida **indicadores de marketing, operação, clínica e financeiro** em visões simples, pensadas principalmente para donos de clínica e gestores.
+
+### Principais conceitos e dados
+
+- **Painel de funil**
+  - Leads por campanha/canal
+  - Taxa de conversão lead → agendamento → atendimento → boleto pago
+- **Painel de agenda**
+  - Furo de agenda (faltas, cancelamentos)
+  - Ocupação por profissional/unidade
+- **Painel financeiro**
+  - Receita por período, unidade, profissional
+  - Inadimplência por faixa de atraso
+- **Painel de marketing**
+  - Desempenho de campanhas (leads gerados, agendamentos, atendimentos, receita associada)
+
+### Regras de negócio principais
+
+- Relatórios devem trabalhar principalmente sobre dados já consolidados no banco transacional, com possibilidade de sumarizações assíncronas (jobs em background) para períodos maiores.
+- Os filtros principais devem ser: período, empresa/unidade, profissional, campanha.
+- Indicadores financeiros exibidos em relatórios não devem expor detalhes de pacientes além do necessário (respeito a privacidade/LGPD).
+
+### Requisitos funcionais (relatórios)
+
+| ID         | Descrição |
+|------------|-----------|
+| RF-REL-01  | Disponibilizar dashboards de funil (lead → agendamento → atendimento → boleto pago) por período, empresa/unidade e campanha. |
+| RF-REL-02  | Disponibilizar dashboards de agenda (ocupação, faltas, cancelamentos) por profissional e unidade. |
+| RF-REL-03  | Disponibilizar dashboards financeiros (receita, inadimplência por faixa de atraso, recebimentos por plano/tratamento). |
+| RF-REL-04  | Permitir filtros principais (período, empresa/unidade, profissional, campanha) em todos os painéis. |
+| RF-REL-05  | Gerar relatórios exportáveis (CSV/Excel) para análise externa, quando aplicável. |
+
+---
