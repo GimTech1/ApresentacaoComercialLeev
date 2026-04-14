@@ -789,7 +789,8 @@
   /* Backgrounds limpos */
   .hero, .problem, .solution, .roi, .benefits, .pricing { background: var(--luxe-cream) !important; }
   .hero::before, .hero::after { display: none !important; }
-  .hero > .container { position: relative; z-index: 2; }
+  .slides > section.hero { min-height: 0 !important; }
+  .hero > .container { position: relative; z-index: 2; width: 100%; }
 
   /* Cards do problema: flat, só linha superior */
   .problem-card {
@@ -1323,6 +1324,9 @@
   }
   fitSlides();
   window.addEventListener('load', fitSlides);
+  document.querySelectorAll('img').forEach(img => {
+    if (!img.complete) img.addEventListener('load', fitSlides);
+  });
   window.addEventListener('resize', () => { fitSlides(); goTo(currentIndex()); });
 
   // Navegação por scroll do mouse (vertical -> horizontal)
