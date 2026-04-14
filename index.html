@@ -1015,10 +1015,13 @@
     width: auto;
     height: auto;
     object-fit: contain;
-    filter:
-      drop-shadow(0 60px 60px rgba(20,22,15,0.55))
-      drop-shadow(0 30px 30px rgba(20,22,15,0.35))
-      drop-shadow(0 10px 15px rgba(20,22,15,0.25));
+    border-radius: 280px 280px 12px 12px;
+    padding: 14px;
+    background: var(--luxe-cream);
+    box-shadow:
+      0 0 0 1px var(--luxe-gold),
+      0 60px 80px -20px rgba(20,22,15,0.45),
+      0 30px 50px -20px rgba(20,22,15,0.3);
   }
   .image-slot.filled.wide img { max-height: 68vh; }
 
