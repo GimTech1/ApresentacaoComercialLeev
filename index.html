@@ -1095,6 +1095,74 @@
     border-top: 1px solid var(--luxe-line);
     border-bottom: 1px solid var(--luxe-line);
   }
+
+  /* ============================================================
+     RESPONSIVO — Tablet & Mobile
+     ============================================================ */
+  @media (max-width: 1024px) {
+    .slides > section > .container { max-width: 92vw; }
+    .slide-layout { gap: 2.5rem; }
+    .chip-grid { grid-template-columns: repeat(3, 1fr); }
+    .stat-row { gap: 1.25rem; }
+    .big-stat strong { font-size: clamp(2.5rem, 6vw, 4rem); }
+  }
+
+  @media (max-width: 768px) {
+    .topbar { padding: 0.75rem 0 !important; }
+    .topbar .container { padding: 0 1rem; }
+    .logo img { height: 48px !important; }
+    .topbar-tag { font-size: 0.6rem !important; letter-spacing: 0.2em; }
+    .slides { top: 72px !important; height: calc(100vh - 72px) !important; }
+
+    .slides > section { padding: 1.25rem 0 !important; }
+    .slides > section > .container { padding: 0 1.25rem; max-width: 100vw; }
+
+    .slide-layout,
+    .slide-layout.center { grid-template-columns: 1fr !important; gap: 1.25rem; text-align: left; justify-items: stretch; }
+
+    .slides .section-title { font-size: clamp(1.4rem, 6vw, 2rem) !important; }
+    .slides .section-eyebrow { font-size: 0.6rem !important; letter-spacing: 0.25em !important; }
+    .slide-layout .copy p { font-size: 0.9rem; }
+
+    .image-slot.filled img {
+      max-height: 42vh;
+      padding: 8px;
+    }
+
+    .kicker-list { gap: 0.6rem; margin-top: 1rem; }
+    .kicker-list li { padding-bottom: 0.6rem; gap: 0.75rem; }
+    .kicker-list .label { font-size: 0.95rem; }
+
+    .chip-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 0.6rem; margin-top: 1rem; }
+    .chip { padding: 0.9rem 0.6rem; font-size: 0.78rem; }
+
+    .stat-row {
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 1rem 1.25rem;
+      padding: 1.5rem 0 !important;
+      margin-top: 1.25rem !important;
+    }
+    .big-stat strong { font-size: clamp(2.2rem, 9vw, 3rem); }
+    .big-stat span { font-size: 0.65rem; margin-top: 0.4rem; }
+
+    .slides .pricing-grid { grid-template-columns: 1fr !important; gap: 1rem; margin-top: 1.25rem; }
+    .slides .plan { padding: 1.25rem 1.25rem !important; }
+    .plan-price .amount { font-size: 2.5rem !important; }
+
+    .final-cta h2 { font-size: clamp(1.8rem, 7vw, 2.6rem) !important; }
+    .final-cta-btn { padding: 0.9rem 2rem !important; font-size: 0.7rem !important; }
+
+    .slide-indicator { bottom: 0.75rem !important; padding: 0.5rem 0.9rem !important; gap: 0.45rem !important; }
+    .slide-indicator .dot { width: 6px; height: 6px; }
+    .slide-indicator .dot.active { width: 16px; }
+    .slide-arrow { display: none !important; }
+  }
+
+  @media (max-width: 420px) {
+    .chip-grid { grid-template-columns: 1fr 1fr; }
+    .slides .section-title { font-size: clamp(1.3rem, 6.5vw, 1.8rem) !important; }
+    .image-slot.filled img { max-height: 38vh; }
+  }
 </style>
 </head>
 <body>
