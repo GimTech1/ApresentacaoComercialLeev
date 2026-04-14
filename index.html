@@ -1005,14 +1005,7 @@
     position: relative;
   }
   .image-slot.filled::before { display: none; }
-  .image-slot.filled::after {
-    content: '';
-    position: absolute;
-    inset: 24px -24px -24px 24px;
-    border: 1px solid var(--luxe-gold);
-    z-index: 0;
-    pointer-events: none;
-  }
+  .image-slot.filled::after { display: none; }
   .image-slot.filled img {
     position: relative;
     z-index: 1;
