@@ -989,6 +989,9 @@
   .image-slot span { opacity: 0.6; }
   .image-slot.wide { aspect-ratio: 21 / 9; }
   .image-slot.square { aspect-ratio: 1 / 1; }
+  .image-slot.filled { border: none; background: transparent; padding: 0; overflow: hidden; }
+  .image-slot.filled::before { display: none; }
+  .image-slot.filled img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
   .kicker-list {
     list-style: none;
@@ -1081,7 +1084,7 @@
         <h1 class="section-title">A operação da sua clínica,<br/><em>organizada.</em></h1>
         <p>Uma plataforma. Do primeiro contato ao financeiro.</p>
       </div>
-      <div class="image-slot"><span>Imagem · Hero / Dashboard</span></div>
+      <div class="image-slot filled"><img src="images/Ap1.png" alt="" /></div>
     </div>
   </div>
 </section>
@@ -1090,7 +1093,7 @@
 <section class="problem">
   <div class="container">
     <div class="slide-layout">
-      <div class="image-slot"><span>Imagem · Caos operacional</span></div>
+      <div class="image-slot filled"><img src="images/Ap2.jpg" alt="" /></div>
       <div class="copy">
         <span class="section-eyebrow">O Cenário</span>
         <h2 class="section-title">Sua clínica <em>perde</em> dinheiro sem saber.</h2>
@@ -1132,7 +1135,7 @@
       <span class="section-eyebrow">Interface</span>
       <h2 class="section-title">Desenhado para <em>quem usa.</em></h2>
     </div>
-    <div class="image-slot wide" style="max-width:1000px;"><span>Imagem · Screenshot do Dashboard</span></div>
+    <div class="image-slot filled wide" style="max-width:1000px;"><img src="images/Ap3.jpg" alt="" /></div>
   </div>
 </section>
 
@@ -1150,7 +1153,7 @@
           <li><span class="num">↗</span><span class="label">Pronto para crescer</span></li>
         </ul>
       </div>
-      <div class="image-slot"><span>Imagem · Equipe / Resultado</span></div>
+      <div class="image-slot filled"><img src="images/Ap4.jpg" alt="" /></div>
     </div>
   </div>
 </section>
