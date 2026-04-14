@@ -787,7 +787,9 @@
   .section-title em::after { display: none !important; }
 
   /* Backgrounds limpos */
-  .problem, .solution, .roi, .benefits, .pricing { background: var(--luxe-cream) !important; }
+  .hero, .problem, .solution, .roi, .benefits, .pricing { background: var(--luxe-cream) !important; }
+  .hero::before, .hero::after { display: none !important; }
+  .hero > .container { position: relative; z-index: 2; }
 
   /* Cards do problema: flat, só linha superior */
   .problem-card {
