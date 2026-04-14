@@ -80,10 +80,56 @@
     width: 100vw;
     height: 100%;
     scroll-snap-align: start;
-    overflow-y: auto;
+    overflow: hidden;
     min-height: 0;
+    padding: 2rem 0 !important;
+    display: flex;
+    align-items: center;
   }
-  .slides > section.hero { min-height: 0; padding: 3rem 0 2rem; }
+  .slides > section > .container {
+    width: 100%;
+    max-width: min(1400px, 95vw);
+    transform-origin: center center;
+  }
+  .slides > section.hero { padding: 1.5rem 0 !important; }
+  .slides .section-lead { margin-bottom: 1.5rem; }
+  .slides .section-title { font-size: clamp(1.6rem, 3.2vw, 2.6rem); margin-bottom: 1rem; }
+  .slides .section-eyebrow { margin-bottom: 0.75rem; }
+  .slides .problem-grid,
+  .slides .features-grid { margin-top: 1.5rem; gap: 1.25rem; }
+  .slides .features-grid { grid-template-columns: repeat(4, 1fr); }
+  .slides .problem-grid { grid-template-columns: repeat(4, 1fr); }
+  .slides .problem-card { padding: 1.25rem 1.25rem; }
+  .slides .problem-card .num { font-size: 2rem; margin-bottom: 0.5rem; }
+  .slides .problem-card h3 { font-size: 0.95rem; margin-bottom: 0.4rem; }
+  .slides .problem-card p { font-size: 0.82rem; }
+  .slides .feature { padding-top: 1rem; }
+  .slides .feature h3 { font-size: 0.95rem; }
+  .slides .feature p { font-size: 0.82rem; line-height: 1.5; }
+  .slides .benefits-layout { gap: 3rem; }
+  .slides .benefits-list li { padding: 0.9rem 0; gap: 1rem; }
+  .slides .benefits-list .check { width: 30px; height: 30px; }
+  .slides .benefits-list h4 { font-size: 1rem; }
+  .slides .benefits-list p { font-size: 0.85rem; }
+  .slides .quote-block { padding: 2rem; }
+  .slides .quote-block blockquote { font-size: 1.1rem; margin-bottom: 1rem; }
+  .slides .roi-numbers { margin-top: 2rem; padding: 2rem 1.5rem; gap: 1.5rem; }
+  .slides .roi-number strong { font-size: 3rem; }
+  .slides .pricing-grid { margin-top: 2rem; gap: 1.5rem; }
+  .slides .plan { padding: 1.75rem 1.5rem; }
+  .slides .plan-tag { margin-bottom: 1rem; padding-bottom: 1rem; }
+  .slides .plan-price .amount { font-size: 3rem; }
+  .slides .plan-annual { margin-bottom: 1rem; }
+  .slides .plan-note { margin-bottom: 1rem; padding: 0.5rem 0.75rem; }
+  .slides .plan-features { margin-bottom: 1.25rem; }
+  .slides .plan-features li { padding: 0.35rem 0; font-size: 0.85rem; }
+  .slides .plan-cta { padding: 0.9rem; }
+  .slides .final-cta { padding: 3rem 0 !important; }
+  .slides .final-cta p { margin: 0 auto 1.75rem; }
+  @media (max-width: 1100px) {
+    .slides .features-grid,
+    .slides .problem-grid { grid-template-columns: repeat(2, 1fr); }
+  }
   .slide-indicator {
     position: fixed;
     bottom: 2rem;
@@ -702,7 +748,7 @@
 <!-- Top Bar -->
 <div class="topbar">
   <div class="container topbar-inner">
-    <div class="logo"><img src="images/feez-preto.png" alt="feez!" /></div>
+    <div class="logo"><img src="/images/feez-preto.png" alt="feez!" /></div>
     <div class="topbar-tag">Apresentação Comercial</div>
   </div>
 </div>
@@ -716,20 +762,6 @@
       Uma plataforma completa para clínicas que querem crescer sem caos.
       Do primeiro contato do paciente até o financeiro — tudo conectado, simples e inteligente.
     </p>
-    <div class="hero-meta">
-      <div>
-        <strong>+17</strong>
-        <span>Módulos integrados</span>
-      </div>
-      <div>
-        <strong>24h</strong>
-        <span>Migração assistida</span>
-      </div>
-      <div>
-        <strong>100%</strong>
-        <span>Recursos liberados</span>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -973,7 +1005,7 @@
 
 <footer>
   <div class="container">
-    <div class="logo" style="justify-content:center;margin-bottom:1rem;"><img src="images/feez-branco.png" alt="feez!" /></div>
+    <div class="logo" style="justify-content:center;margin-bottom:1rem;"><img src="/images/feez-branco.png" alt="feez!" /></div>
     <p>Organiza a operação da sua clínica · © 2026 feez!</p>
   </div>
 </footer>
@@ -1039,7 +1071,34 @@
     indicator.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === idx));
   }
   deck.addEventListener('scroll', () => { requestAnimationFrame(updateDots); });
-  window.addEventListener('resize', () => goTo(currentIndex()));
+
+  // Auto-fit: escala cada .container para caber na viewport sem rolagem
+  function fitSlides() {
+    sections.forEach(section => {
+      const container = section.querySelector(':scope > .container');
+      if (!container) return;
+      container.style.transform = 'none';
+      const available = section.clientHeight - 32;
+      const needed = container.scrollHeight;
+      const scale = needed > available ? available / needed : 1;
+      container.style.transform = scale < 1 ? `scale(${scale})` : 'none';
+    });
+  }
+  fitSlides();
+  window.addEventListener('load', fitSlides);
+  window.addEventListener('resize', () => { fitSlides(); goTo(currentIndex()); });
+
+  // Navegação por scroll do mouse (vertical -> horizontal)
+  let wheelLock = false;
+  deck.addEventListener('wheel', (e) => {
+    const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (Math.abs(delta) < 5) return;
+    e.preventDefault();
+    if (wheelLock) return;
+    wheelLock = true;
+    goTo(currentIndex() + (delta > 0 ? 1 : -1));
+    setTimeout(() => { wheelLock = false; }, 700);
+  }, { passive: false });
 
   // Navegação por teclado
   document.addEventListener('keydown', (e) => {
